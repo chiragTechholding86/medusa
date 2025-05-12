@@ -29,8 +29,9 @@ class CustomRepository extends DALUtils.MikroOrmBaseRepository {
   getActiveManager<TManager = unknown>({
     transactionManager,
     manager,
+    tenantId,
   }: Context = {}): TManager {
-    return super.getActiveManager({ transactionManager, manager })
+    return super.getActiveManager({ transactionManager, manager, tenantId })
   }
 
   getFreshManager<TManager = unknown>(): TManager {

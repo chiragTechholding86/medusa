@@ -78,4 +78,9 @@ export type Context<TManager = unknown> = {
    * preventReleaseEvents
    */
   preventReleaseEvents?: boolean
+
+  /**
+   * A string indicating the ID of the current tenant.
+   */
+  tenantId?: string
 }
