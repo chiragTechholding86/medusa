@@ -24,7 +24,6 @@ import {
   isPresent,
   upperCaseFirst,
 } from "@medusajs/utils"
-import { pgConnectionLoader } from "./database"
 
 import type { Knex } from "@mikro-orm/knex"
 import { aliasTo, asValue } from "awilix"
@@ -34,6 +33,8 @@ import {
   container as mainContainer,
   MedusaContainer,
 } from "./container"
+import { TenantConnectionManager } from "./tenant/tenant-connection-manager"
+import { TenantContext } from "./types/tenant"
 
 export class MedusaAppLoader {
   /**
@@ -106,11 +107,20 @@ export class MedusaAppLoader {
     return configModules
   }
 
-  protected prepareSharedResourcesAndDeps() {
+  protected prepareSharedResourcesAndDeps(tenantContext?: TenantContext) {
+    let connection: Knex
+    if (tenantContext?.tenantId) {
+      connection = this.#container.resolve<TenantConnectionManager>(
+        ContainerRegistrationKeys.TENANT_CONNECTION_MANAGER
+      ).getConnection(tenantContext.tenantId)
+    } else {
+      connection = this.#container.resolve<Knex>(
+        ContainerRegistrationKeys.PG_CONNECTION
+      )
+    }
+
     const injectedDependencies = {
-      [ContainerRegistrationKeys.PG_CONNECTION]: this.#container.resolve<
-        Knex<any>
-      >(ContainerRegistrationKeys.PG_CONNECTION),
+      [ContainerRegistrationKeys.PG_CONNECTION]: connection,
       [ContainerRegistrationKeys.LOGGER]: this.#container.resolve(
         ContainerRegistrationKeys.LOGGER
       ),
@@ -124,12 +134,7 @@ export class MedusaAppLoader {
 
     const sharedResourcesConfig: ModuleServiceInitializeOptions = {
       database: {
-        clientUrl:
-          (
-            injectedDependencies[
-              ContainerRegistrationKeys.PG_CONNECTION
-            ] as ReturnType<typeof pgConnectionLoader>
-          )?.client?.config?.connection?.connectionString ??
+        clientUrl: connection?.client?.config?.connection?.connectionString ??
           configManager.config.projectConfig.databaseUrl,
         driverOptions: configManager.config.projectConfig.databaseDriverOptions,
         pool: pool,
@@ -153,14 +158,17 @@ export class MedusaAppLoader {
     {
       moduleNames,
       action = "run",
+      tenantContext,
     }:
       | {
           moduleNames?: never
           action: "run"
+          tenantContext?: TenantContext
         }
       | {
           moduleNames: string[]
           action: "revert" | "generate"
+          tenantContext?: TenantContext
         } = {
       action: "run",
     }
@@ -168,7 +176,7 @@ export class MedusaAppLoader {
     const configModules = this.mergeDefaultModules(configManager.config.modules)
 
     const { sharedResourcesConfig, injectedDependencies } =
-      this.prepareSharedResourcesAndDeps()
+      this.prepareSharedResourcesAndDeps(tenantContext)
 
     const migrationOptions = {
       modulesConfig: configModules,
@@ -190,10 +198,12 @@ export class MedusaAppLoader {
   /**
    * Return an instance of the link module migration planner.
    */
-  async getLinksExecutionPlanner(): Promise<ILinkMigrationsPlanner> {
+  async getLinksExecutionPlanner(
+    tenantContext?: TenantContext
+  ): Promise<ILinkMigrationsPlanner> {
     const configModules = this.mergeDefaultModules(configManager.config.modules)
     const { sharedResourcesConfig, injectedDependencies } =
-      this.prepareSharedResourcesAndDeps()
+      this.prepareSharedResourcesAndDeps(tenantContext)
 
     const migrationOptions = {
       modulesConfig: configModules,
@@ -209,9 +219,9 @@ export class MedusaAppLoader {
   /**
    * Run the modules loader without taking care of anything else. This is useful for running the loader as a separate action or to re run all modules loaders.
    */
-  async runModulesLoader(): Promise<void> {
+  async runModulesLoader(tenantContext?: TenantContext): Promise<void> {
     const { sharedResourcesConfig, injectedDependencies } =
-      this.prepareSharedResourcesAndDeps()
+      this.prepareSharedResourcesAndDeps(tenantContext)
     const configModules = this.mergeDefaultModules(configManager.config.modules)
 
     await MedusaApp({
@@ -228,13 +238,17 @@ export class MedusaAppLoader {
    * Load all modules and bootstrap all the modules and links to be ready to be consumed
    * @param config
    */
-  async load(config = { registerInContainer: true }): Promise<MedusaAppOutput> {
+  async load(
+    config: { registerInContainer: boolean; tenantContext?: TenantContext } = {
+      registerInContainer: true,
+    }
+  ): Promise<MedusaAppOutput> {
     const configModule: ConfigModule = this.#container.resolve(
       ContainerRegistrationKeys.CONFIG_MODULE
     )
 
     const { sharedResourcesConfig, injectedDependencies } =
-      this.prepareSharedResourcesAndDeps()
+      this.prepareSharedResourcesAndDeps(config.tenantContext)
 
     this.#container.register(
       ContainerRegistrationKeys.REMOTE_QUERY,

@@ -14,4 +14,5 @@ export const ContainerRegistrationKeys = {
    */
   LINK: "link",
   FEATURE_FLAG_ROUTER: "featureFlagRouter",
+  TENANT_CONNECTION_MANAGER: "__tenant_connection_manager__",
 } as const

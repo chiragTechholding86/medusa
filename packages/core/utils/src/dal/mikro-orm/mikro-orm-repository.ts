@@ -52,8 +52,15 @@ export class MikroOrmBase {
   getActiveManager<TManager = unknown>({
     transactionManager,
     manager,
+    tenantId,
   }: Context = {}): TManager {
-    return (transactionManager ?? manager ?? this.getFreshManager()) as TManager
+    const activeManager = (transactionManager ?? manager ?? this.getFreshManager()) as SqlEntityManager;
+    if (tenantId) {
+      // Set the schema for the tenant
+      const schema = `tenant_${tenantId}`;
+      activeManager.getKnex().raw(`SET search_path TO ${schema}`);
+    }
+    return activeManager as TManager;
   }
 
   async transaction<TManager = unknown>(

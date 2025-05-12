@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express"
 import type { ZodNullable, ZodObject, ZodOptional, ZodRawShape } from "zod"
+import { Context } from "@medusajs/types"
 
 import {
   FindConfig,
@@ -173,9 +174,9 @@ export interface MedusaRequest<
    */
   pricingContext?: MedusaPricingContext
   /**
-   * A generic context object that can be used across the request lifecycle
+   * A context object that can be used across the request lifecycle
    */
-  context?: Record<string, any>
+  context: Context
 
   /**
    * Custom validator to validate the `additional_data` property in

@@ -83,4 +83,9 @@ export type Context<TManager = unknown> = {
    * A boolean value indicating whether the current workflow execution is being cancelled.
    */
   isCancelling?: boolean
+
+  /**
+   * A string indicating the ID of the current tenant.
+   */
+  tenantId?: string
 }
